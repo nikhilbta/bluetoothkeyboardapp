@@ -90,7 +90,7 @@ public class Model implements UpdateView{
         }
     }
     public void pairedDevicePicked(int position){
-        if(position == 0){
+        if(position <= 0){
             return;
         }
         BluetoothDevice newDevice = pairedDevices.get(position-1);
@@ -194,6 +194,9 @@ public class Model implements UpdateView{
     }
     public BluetoothDevice getTargetDevice(){
         return targetDevice;
+    }
+    public BluetoothHidDevice getHidDevice(){
+        return hidDevice;
     }
 
     private ArrayList<String> getNameList(ArrayList<BluetoothDevice> BluetoothDevices, int type){
