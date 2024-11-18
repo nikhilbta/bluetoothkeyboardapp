@@ -143,7 +143,7 @@ public class Model implements UpdateView{
         }
     }
     public void availableDevicePicked(int position){
-        if(position == 0){
+        if(position <= 0){
             return;
         }
         BluetoothDevice device = availableDevices.get(position-1); // Get the selected device
