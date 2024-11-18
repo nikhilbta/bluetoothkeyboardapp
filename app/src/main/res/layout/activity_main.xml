@@ -36,7 +36,7 @@
         android:layout_width="400dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="16dp"
-        android:layout_marginTop="4dp"
+        android:layout_marginTop="16dp"
         android:layout_marginEnd="16dp"
         android:text="Input Text"
         app:layout_constraintEnd_toEndOf="parent"
@@ -44,23 +44,73 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/TextInputLayout" />
 
-    <Spinner
-        android:id="@+id/devices"
-        android:layout_width="200dp"
-        android:layout_height="40dp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        />
-    <Spinner
-        android:id="@+id/paireddevices"
-        android:layout_width="200dp"
-        android:layout_height="40dp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toEndOf="@id/devices"/>
-
     <Button
-        android:id="@+id/repeat_input"
+        android:id="@+id/delLet"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Repeat Input"
-        app:layout_constraintTop_toBottomOf="@id/inputbutton" />
+        android:layout_marginTop="4dp"
+        android:layout_marginEnd="10dp"
+        android:text="Delete Letter"
+        app:layout_constraintEnd_toStartOf="@+id/delWord"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/inputbutton" />
+
+    <Button
+        android:id="@+id/delWord"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="10dp"
+        android:layout_marginTop="4dp"
+        android:layout_marginEnd="10dp"
+        android:text="Delete Word"
+        app:layout_constraintEnd_toStartOf="@+id/delLine"
+        app:layout_constraintStart_toEndOf="@+id/delLet"
+        app:layout_constraintTop_toBottomOf="@+id/inputbutton" />
+
+    <Button
+        android:id="@+id/delLine"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="10dp"
+        android:layout_marginTop="4dp"
+        android:text="Delete Line"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.5"
+        app:layout_constraintStart_toEndOf="@+id/delWord"
+        app:layout_constraintTop_toBottomOf="@+id/inputbutton" />
+
+    <Spinner
+        android:id="@+id/devices"
+        android:layout_width="240dp"
+        android:layout_height="40dp"
+        android:layout_marginStart="10dp"
+        android:layout_marginTop="4dp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/delLet" />
+    <Spinner
+        android:id="@+id/paireddevices"
+        android:layout_width="240dp"
+        android:layout_height="40dp"
+        android:layout_marginStart="10dp"
+        android:layout_marginTop="4dp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/devices" />
+    <TextView
+        android:id="@+id/devices_label"
+        android:layout_width="100dp"
+        android:layout_height="40dp"
+
+        android:layout_marginTop="16dp"
+        android:layout_marginEnd="10dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/delLine" />
+    <TextView
+        android:id="@+id/paireddevices_label"
+        android:layout_width="100dp"
+        android:layout_height="40dp"
+
+        android:layout_marginTop="16dp"
+        android:layout_marginEnd="10dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/devices_label" />
 </androidx.constraintlayout.widget.ConstraintLayout>

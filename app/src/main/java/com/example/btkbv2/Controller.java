@@ -46,7 +46,6 @@ public class Controller extends Activity implements UpdateView {
     private BluetoothPermissionManager bluetoothPermissionManager;
     private Model model;
     private UpdateView UView;
-    private String inputValue;
 
 
     @RequiresApi(api = Build.VERSION_CODES.S)
@@ -81,22 +80,14 @@ public class Controller extends Activity implements UpdateView {
 
 
         findViewById(R.id.inputbutton).setOnClickListener(v -> {
-            inputValue = textInputEditText.getText().toString();
-            if(model.getTargetDevice() != null){
-                try {
-                    model.convertTextToHidReport(inputValue);
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
-                }
-                Log.d("mainpain", "Input value: " + inputValue);
-                textInputEditText.setText("");
+            String inputValue = textInputEditText.getText().toString();
+            try {
+                model.convertTextToHidReport(inputValue);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
             }
-            else{
-                toastMessage(Controller.this, "No Device Connected");
-            }
-        });
-        findViewById(R.id.repeat_input).setOnClickListener(v -> {
-            textInputEditText.setText(inputValue);
+            Log.d("mainpain", "Input value: " + inputValue);
+            textInputEditText.setText("");
         });
 
 
@@ -106,24 +97,22 @@ public class Controller extends Activity implements UpdateView {
     protected void onResume() {
         super.onResume();
         getProxy();
-        Log.d("mainpain", "on Resume");
-        if(model.getHidDevice() != null & model.getTargetDevice() != null){
-            model.getHidDevice().connect(model.getTargetDevice());
-        }
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        if(model.getHidDevice() != null & model.getTargetDevice() != null){
-            model.getHidDevice().disconnect(model.getTargetDevice());
+        model.unregisterHidDevice();
+        if (receiver != null) {
+            unregisterReceiver(receiver);
         }
-        Log.d("mainpain", "on Pause");
     }
 
     protected void onDestroy() {
         super.onDestroy();
-        model.getHidDevice().connect(model.getTargetDevice());
+        if (receiver != null) {
+            unregisterReceiver(receiver);
+        }
     }
 
     private void getProxy() {
