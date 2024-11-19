@@ -11,6 +11,7 @@ import android.bluetooth.BluetoothHidDeviceAppSdpSettings;
 import android.bluetooth.BluetoothProfile;
 import android.content.Context;
 import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.widget.ArrayAdapter;
 import android.widget.Spinner;
@@ -65,9 +66,6 @@ public class Model implements UpdateView{
 
         hidDevice.registerApp(sdp, null, null, executor, callback);
     }
-    public void unregisterHidDevice(){
-        hidDevice.unregisterApp();
-    }
 
 
 
@@ -92,37 +90,15 @@ public class Model implements UpdateView{
 
         if (currentSelection >= 0 && currentSelection < adapter.getCount()) {
             pairedDevicesSpinner.setSelection(currentSelection);
-            //pairedDevicePicked(currentSelection);
         }
     }
     public void pairedDevicePicked(int position){
-        Log.d("mainpain", "pos:" + position);
-        if(position == 0 && targetDevice != null){
-
+        Log.e("mainpain", "position: " + position);
+        if(position > 0){
+            targetDevice = pairedDevices.get(position - 1);
+        }
+        else{
             hidDevice.disconnect(targetDevice);
-            int state = hidDevice.getConnectionState(targetDevice);
-            Log.d("mainpain", "state: " + state);
-            targetDevice = null;
-        }
-        if(position <= 0){
-            return;
-        }
-        if(!pairedDevices.get(position-1).getName().equals("Paired Devices")){
-            newDevice = pairedDevices.get(position-1);
-        }
-
-
-        Log.d("mainpain", "btConnect: device=" + newDevice);
-        Log.d("mainpain", "targetdevice=" + targetDevice);
-        if (newDevice != null) {
-            int state = hidDevice.getConnectionState(newDevice);
-            Log.d("mainpain", "State:" + state);
-            if (state == BluetoothProfile.STATE_DISCONNECTED) {
-                // Device is disconnected, proceed with connection to the new device
-                Log.d("mainpain", "Device disconnected successfully. Connecting to new device: " + newDevice);
-                targetDevice = newDevice;
-                hidDevice.connect(targetDevice);
-            }
         }
     }
     public void updateAvailableDevicesSpinnerModel(ArrayList<BluetoothDevice> newAvailableDevices) {
@@ -161,6 +137,8 @@ public class Model implements UpdateView{
         }
 
     }
+
+
 
 
 
@@ -250,45 +228,42 @@ public class Model implements UpdateView{
         sendReport(reportMessage,0);
     }
 
-    public void sendReport(ArrayList<byte[]> report, int start) throws InterruptedException {
-        reportSave = report;
-        int state = hidDevice.getConnectionState(targetDevice);
-        switch (state) {
-            case BluetoothProfile.STATE_DISCONNECTED:
-                Log.d("Bluetooth", "The device is disconnected.");
-                break;
-            case BluetoothProfile.STATE_CONNECTING:
-                Log.d("Bluetooth", "The device is connecting...");
-                break;
-            case BluetoothProfile.STATE_CONNECTED:
-                Log.d("Bluetooth", "The device is connected!");
-                byte[] report2 = new byte[8];
-                report2[2] = 0x00;
-                for (int i = start; i < report.size(); i++) {
-                    // Send the HID report with the key down press
-                    hidDevice.sendReport(targetDevice, SUBCLASS1_KEYBOARD, report.get(i));
-                    Thread.sleep(20);
-                    hidDevice.sendReport(targetDevice, SUBCLASS1_KEYBOARD, report2);
-                    Thread.sleep(20);
 
-                    currentByte +=1;
+
+    public void sendReport(ArrayList<byte[]> report, int start) {
+        Handler handler = new Handler(Looper.getMainLooper());
+        handler.post(() -> {
+            try {
+                reportSave = report;
+                int state = hidDevice.getConnectionState(targetDevice);
+                if (state == BluetoothProfile.STATE_CONNECTED) {
+                    byte[] report2 = new byte[8];
+                    report2[2] = 0x00;
+
+                    for (int i = start; i < report.size(); i++) {
+                        int finalI = i;
+                        handler.postDelayed(() -> {
+                            hidDevice.sendReport(targetDevice, SUBCLASS1_KEYBOARD, report.get(finalI));
+                            hidDevice.sendReport(targetDevice, SUBCLASS1_KEYBOARD, report2);
+                            currentByte += 1;
+                        }, i * 40); // 40ms delay between keystrokes
+                    }
+
+                    // Final cleanup after all keystrokes
+                    handler.postDelayed(() -> {
+                        hidDevice.sendReport(targetDevice, SUBCLASS1_KEYBOARD, report2);
+                        reportSave.clear();
+                        currentByte = 0;
+                    }, report.size() * 40);
+                } else {
+                    Log.d("Bluetooth", "Device is not in a connected state.");
                 }
-
-
-
-                hidDevice.sendReport(targetDevice, SUBCLASS1_KEYBOARD, report2);
-
-                reportSave.clear();
-                currentByte = 0;
-                break;
-            case BluetoothProfile.STATE_DISCONNECTING:
-                Log.d("Bluetooth", "The device is disconnecting...");
-                break;
-            default:
-                Log.d("Bluetooth", "Unknown state: " + state);
-        }
-
+            } catch (Exception e) {
+                Log.e("Bluetooth", "Error: " + e.getMessage());
+            }
+        });
     }
+
 
 
     private byte getKeyCode(char character) {

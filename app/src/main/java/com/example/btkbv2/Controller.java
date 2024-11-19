@@ -49,6 +49,8 @@ public class Controller extends Activity implements UpdateView {
 
     private String inputValue;
     private int regState;
+    private boolean isRepeatActive = false;
+    private String lastInput = ""; // To store the last input before repeating
 
 
     @RequiresApi(api = Build.VERSION_CODES.S)
@@ -82,7 +84,7 @@ public class Controller extends Activity implements UpdateView {
 
         findViewById(R.id.inputbutton).setOnClickListener(v -> {
             inputValue = textInputEditText.getText().toString();
-            if(model.getTargetDevice() != null){
+            if(model.getTargetDevice() != null && model.getHidDevice().getConnectionState(model.getTargetDevice()) == BluetoothProfile.STATE_CONNECTED){
                 try {
                     model.convertTextToHidReport(inputValue);
                 } catch (InterruptedException e) {
@@ -95,9 +97,28 @@ public class Controller extends Activity implements UpdateView {
                 toastMessage(Controller.this, "No Device Connected");
             }
         });
+
+
         findViewById(R.id.repeat_input).setOnClickListener(v -> {
-            textInputEditText.setText(inputValue);
+            // Check if repeat is currently active
+            if (!isRepeatActive) {
+                // Save the current text before repeating
+                lastInput = textInputEditText.getText().toString();
+
+                // Repeat the input value
+                textInputEditText.setText(inputValue);
+
+                // Set flag to indicate repeat is active
+                isRepeatActive = true;
+            } else {
+                // Undo the repeat by restoring the last input
+                textInputEditText.setText(lastInput);
+
+                // Set flag to indicate repeat is no longer active
+                isRepeatActive = false;
+            }
         });
+
 
     }
 
@@ -106,33 +127,9 @@ public class Controller extends Activity implements UpdateView {
         super.onResume();
         getProxy();
         Log.d("mainpain", "on Resume");
-
-        Handler handler = new Handler();
-        Runnable checkCondition = new Runnable() {
-            @Override
-            public void run() {
-                if (regState == 1) { // Replace with your condition
-                    Log.e("mainpain", "asdfasdfasdfa");
-                    initializePairedSpinner();
-                    initializeAvailableSpinner();
-                    findAvailableDevices();
-                } else {
-                    handler.postDelayed(this, 500); // Retry after 500ms
-                }
-            }
-        };
-
-        // Start checking
-        handler.post(checkCondition);
-
-        if(model.getCurrentByte() > 0){
-            try {
-                Log.d("mainpain", "its trying to send report");
-                model.sendReport(model.getReportSave(),model.getCurrentByte());
-            }
-            catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
+        if(model.getTargetDevice() != null && model.getHidDevice() != null){
+            Log.d("mainpain", "TD: " + model.getTargetDevice().getName() + "HID: " + model.getHidDevice());
+            connect();
         }
     }
 
@@ -147,6 +144,7 @@ public class Controller extends Activity implements UpdateView {
 
     protected void onDestroy() {
         super.onDestroy();
+        model.getHidDevice().disconnect(model.getTargetDevice());
         if (receiver != null) {
             unregisterReceiver(receiver);
         }
@@ -195,7 +193,7 @@ public class Controller extends Activity implements UpdateView {
                             super.onAppStatusChanged(pluggedDevice, registered);
                             UView.logMessage("mainpain", registered ? "HID Device registered successfully" : "HID Device registration failed");
                             if(registered){
-                                model.pairedDevicePicked(model.getPairedDevicesList().indexOf(model.getTargetDevice()));
+                                //model.pairedDevicePicked(model.getPairedDevicesList().indexOf(model.getTargetDevice()));
                                 regState = 1;
                             }
                             else{
@@ -231,6 +229,10 @@ public class Controller extends Activity implements UpdateView {
             @Override
             public void onItemSelected(AdapterView<?> parent, android.view.View view, int position, long id) {
                 model.pairedDevicePicked(position);
+                if(model.getTargetDevice() != null && model.getHidDevice() != null){
+                    Log.d("mainpain", "testing");
+                    connect();
+                }
             }
 
 
@@ -297,6 +299,23 @@ public class Controller extends Activity implements UpdateView {
         }
 
 
+    }
+
+    public void connect(){
+        Handler handler = new Handler();
+        Runnable checkCondition = new Runnable() {
+            @Override
+            public void run() {
+                if (regState == 1) { // Replace with your condition
+                    model.getHidDevice().connect(model.getTargetDevice());
+                } else {
+                    handler.postDelayed(this, 500); // Retry after 500ms
+                }
+            }
+        };
+
+        // Start checking
+        handler.post(checkCondition);
     }
 
 
