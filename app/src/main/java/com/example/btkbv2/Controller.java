@@ -47,6 +47,9 @@ public class Controller extends Activity implements UpdateView {
     private Model model;
     private UpdateView UView;
 
+    private String inputValue;
+    private int regState;
+
 
     @RequiresApi(api = Build.VERSION_CODES.S)
     @Override
@@ -68,11 +71,9 @@ public class Controller extends Activity implements UpdateView {
 
 
         getProxy();
-
         initializePairedSpinner();
         initializeAvailableSpinner();
         findAvailableDevices();
-
         spinnerListener();
 
 
@@ -80,16 +81,23 @@ public class Controller extends Activity implements UpdateView {
 
 
         findViewById(R.id.inputbutton).setOnClickListener(v -> {
-            String inputValue = textInputEditText.getText().toString();
-            try {
-                model.convertTextToHidReport(inputValue);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
+            inputValue = textInputEditText.getText().toString();
+            if(model.getTargetDevice() != null){
+                try {
+                    model.convertTextToHidReport(inputValue);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+                Log.d("mainpain", "Input value: " + inputValue);
+                textInputEditText.setText("");
             }
-            Log.d("mainpain", "Input value: " + inputValue);
-            textInputEditText.setText("");
+            else {
+                toastMessage(Controller.this, "No Device Connected");
+            }
         });
-
+        findViewById(R.id.repeat_input).setOnClickListener(v -> {
+            textInputEditText.setText(inputValue);
+        });
 
     }
 
@@ -97,15 +105,44 @@ public class Controller extends Activity implements UpdateView {
     protected void onResume() {
         super.onResume();
         getProxy();
+        Log.d("mainpain", "on Resume");
+
+        Handler handler = new Handler();
+        Runnable checkCondition = new Runnable() {
+            @Override
+            public void run() {
+                if (regState == 1) { // Replace with your condition
+                    Log.e("mainpain", "asdfasdfasdfa");
+                    initializePairedSpinner();
+                    initializeAvailableSpinner();
+                    findAvailableDevices();
+                } else {
+                    handler.postDelayed(this, 500); // Retry after 500ms
+                }
+            }
+        };
+
+        // Start checking
+        handler.post(checkCondition);
+
+        if(model.getCurrentByte() > 0){
+            try {
+                Log.d("mainpain", "its trying to send report");
+                model.sendReport(model.getReportSave(),model.getCurrentByte());
+            }
+            catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        model.unregisterHidDevice();
-        if (receiver != null) {
-            unregisterReceiver(receiver);
+        if(model.getHidDevice() != null & model.getTargetDevice() != null) {
+            model.getHidDevice().disconnect(model.getTargetDevice());
         }
+        Log.d("mainpain", "on Pause");
     }
 
     protected void onDestroy() {
@@ -157,7 +194,13 @@ public class Controller extends Activity implements UpdateView {
                         public void onAppStatusChanged(BluetoothDevice pluggedDevice, boolean registered) {
                             super.onAppStatusChanged(pluggedDevice, registered);
                             UView.logMessage("mainpain", registered ? "HID Device registered successfully" : "HID Device registration failed");
-                            if(registered){ model.pairedDevicePicked(model.getPairedDevicesList().indexOf(model.getTargetDevice()));}
+                            if(registered){
+                                model.pairedDevicePicked(model.getPairedDevicesList().indexOf(model.getTargetDevice()));
+                                regState = 1;
+                            }
+                            else{
+                                regState = 0;
+                            }
                         }
 
                         @Override
@@ -193,14 +236,6 @@ public class Controller extends Activity implements UpdateView {
 
             @Override
             public void onNothingSelected(AdapterView<?> parent) {}
-        });
-
-        model.getPairedDevicesSpinner().setOnTouchListener(new View.OnTouchListener() {
-            @Override
-            public boolean onTouch(View v, MotionEvent event) {
-                initializePairedSpinner();
-                return false; // Return false to allow the touch event to be handled by the default behavior (opening the dropdown)
-            }
         });
 
         model.getAvailableDevicesSpinner().setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
