@@ -115,30 +115,14 @@ public class Model implements UpdateView{
         Log.d("mainpain", "btConnect: device=" + newDevice);
         Log.d("mainpain", "targetdevice=" + targetDevice);
         if (newDevice != null) {
-            // Define a handler to manage the polling
-            Handler handler = new Handler();
-            Runnable checkDisconnection = new Runnable() {
-                @Override
-                public void run() {
-                    // Check the current connection state of the target device
-                    int state = hidDevice.getConnectionState(newDevice);
-                    Log.d("mainpain", "State:" + state);
-                    if (state == BluetoothProfile.STATE_DISCONNECTED) {
-                        // Device is disconnected, proceed with connection to the new device
-                        Log.d("mainpain", "Device disconnected successfully. Connecting to new device: " + newDevice);
-                        targetDevice = newDevice;
-                        hidDevice.connect(targetDevice);
-
-                    } else {
-                        // Device is still connected, wait and check again
-                        Log.d("mainpain", "Device still connected. Checking again...");
-                        //handler.postDelayed(this, 500);
-                    }
-                }
-            };
-
-            // Start polling
-            handler.post(checkDisconnection);
+            int state = hidDevice.getConnectionState(newDevice);
+            Log.d("mainpain", "State:" + state);
+            if (state == BluetoothProfile.STATE_DISCONNECTED) {
+                // Device is disconnected, proceed with connection to the new device
+                Log.d("mainpain", "Device disconnected successfully. Connecting to new device: " + newDevice);
+                targetDevice = newDevice;
+                hidDevice.connect(targetDevice);
+            }
         }
     }
     public void updateAvailableDevicesSpinnerModel(ArrayList<BluetoothDevice> newAvailableDevices) {
@@ -240,9 +224,11 @@ public class Model implements UpdateView{
     public void convertTextToHidReport(String text) throws InterruptedException {
         ArrayList<byte[]> reportMessage = new ArrayList<>();
         currentByte = 0;
+        byte[] report = new byte[8];
+
         // HID report size for a keyboard is usually 8 bytes
         for (int i = 0; i < text.length(); i++) {
-            byte[] report = new byte[8];
+            report = new byte[8];
             char character = text.charAt(i);
             byte keyCode = getKeyCode(character);
 
@@ -260,6 +246,7 @@ public class Model implements UpdateView{
             report[2] = keyCode;
             reportMessage.add(report);
         }
+
         sendReport(reportMessage,0);
     }
 
@@ -275,16 +262,22 @@ public class Model implements UpdateView{
                 break;
             case BluetoothProfile.STATE_CONNECTED:
                 Log.d("Bluetooth", "The device is connected!");
+                byte[] report2 = new byte[8];
+                report2[2] = 0x00;
                 for (int i = start; i < report.size(); i++) {
-                    // Send the HID report with the key press
+                    // Send the HID report with the key down press
                     hidDevice.sendReport(targetDevice, SUBCLASS1_KEYBOARD, report.get(i));
                     Thread.sleep(20);
-
-                    hidDevice.sendReport(targetDevice, SUBCLASS1_KEYBOARD, report.get(i));
+                    hidDevice.sendReport(targetDevice, SUBCLASS1_KEYBOARD, report2);
                     Thread.sleep(20);
 
                     currentByte +=1;
                 }
+
+
+
+                hidDevice.sendReport(targetDevice, SUBCLASS1_KEYBOARD, report2);
+
                 reportSave.clear();
                 currentByte = 0;
                 break;
