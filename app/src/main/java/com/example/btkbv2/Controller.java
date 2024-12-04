@@ -24,6 +24,7 @@ import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Spinner;
+import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -37,6 +38,7 @@ import androidx.core.view.WindowInsetsCompat;
 import com.google.android.material.textfield.TextInputEditText;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Set;
 import java.util.concurrent.Executor;
 
@@ -50,8 +52,11 @@ public class Controller extends Activity implements UpdateView {
     private ArrayList<BluetoothDevice> pairedDevices = new ArrayList<>();
     public Spinner availableDevicesSpinner;
     private ArrayList<BluetoothDevice> availableDevices = new ArrayList<>();
-    private Spinner inputs;
-    private Spinner passwords;
+    private Spinner inputsSpinner;
+    private ArrayList<BluetoothDevice> inputs = new ArrayList<>();
+    private Spinner passwordsSpinner;
+    private ArrayList<BluetoothDevice> passwords = new ArrayList<>();
+
 
     private TextInputEditText textInputEditText;
 
@@ -61,14 +66,17 @@ public class Controller extends Activity implements UpdateView {
     private BroadcastReceiver receiver;
 
     private ArrayList<byte[]> reportSave;
-    private int currentByte;
 
     private int regState;
+    private int currentByte;
     private boolean editMode = false;
 
     private String inputValue;
+    private String actualPassword;
     private boolean isRepeatActive = false;
     private String lastInput = ""; // To store the last input before repeating
+
+    private HashMap<String, String> passwordsMap;
 
 
 
@@ -91,60 +99,17 @@ public class Controller extends Activity implements UpdateView {
 
         SharedPreferences prefs = getSharedPreferences("BTKBV2", MODE_PRIVATE);
         inputValue = prefs.getString("input_value", "");
-
+        textInputEditText = findViewById(R.id.TextInputEditLayout);
+        textInputEditText.setText(inputValue);
 
         getProxy();
         updatePairedDevicesSpinnerModel(pairedDevices);
         updateAvailableDevicesSpinnerModel(availableDevices);
+        initializeInputsSpinner();
+        initializePasswordSpinner();
         findAvailableDevices();
         spinnerListener();
-
-
-        textInputEditText = findViewById(R.id.TextInputEditLayout);
-        textInputEditText.setText(inputValue);
-
-        findViewById(R.id.inputbutton).setOnClickListener(v -> {
-            inputValue = textInputEditText.getText().toString();
-            if(targetDevice != null &&  hidDevice.getConnectionState(targetDevice) == BluetoothProfile.STATE_CONNECTED){
-                try {
-                    convertTextToHidReport(inputValue);
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
-                }
-                Log.d("mainpain", "Input value: " + inputValue);
-                textInputEditText.setText("");
-            }
-            else {
-                toastMessage("No Device Connected");
-            }
-        });
-
-
-        findViewById(R.id.repeat_input).setOnClickListener(v -> {
-            // Check if repeat is currently active
-            if (!isRepeatActive) {
-                // Save the current text before repeating
-                lastInput = textInputEditText.getText().toString();
-
-                // Repeat the input value
-                textInputEditText.setText(inputValue);
-
-                // Set flag to indicate repeat is active
-                isRepeatActive = true;
-            } else {
-                // Undo the repeat by restoring the last input
-                textInputEditText.setText(lastInput);
-
-                // Set flag to indicate repeat is no longer active
-                isRepeatActive = false;
-            }
-        });
-
-        findViewById(R.id.edit).setOnClickListener(v -> {
-
-        });
-
-
+        buttonListener();
 
     }
     @Override
@@ -322,16 +287,235 @@ public class Controller extends Activity implements UpdateView {
             }
         });
 
+        inputsSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (editMode) {
+                    // EditMode: Append inputValue to the selected item in inputsSpinner
+                    updateSpinnerWithInputValue(inputsSpinner, position);
+                } else {
+                    // Non-EditMode: Set inputValue to the selected spinner item without the number prefix
+                    if (position > 0) {
+                        String selectedItem = parent.getItemAtPosition(position).toString();
+                        inputValue = selectedItem.substring(selectedItem.indexOf('.') + 1).trim();
+                        textInputEditText.setText(inputValue);
+                    }
+                }
+                // Reset the other spinner
+                passwordsSpinner.setSelection(0);
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {}
+        });
+
+        passwordsSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (position == 0) {
+                    // Do nothing if "Passwords" title is selected
+                    return;
+                }
+
+                String key = position + ".";
+                actualPassword = passwordsMap.get(key);
+
+                if (editMode) {
+                    toastMessage("Edit mode is enabled. Select a different mode to process the password.");
+                } else {
+                    if (actualPassword != null && !actualPassword.isEmpty()) {
+                        // Non-EditMode: Process the actual password but show *
+                        textInputEditText.setText("*".repeat(actualPassword.length())); // Masked in the text box
+                        Log.d("mainpain", "Selected password: " + actualPassword); // Process actual password
+                    } else {
+                        // If the slot is empty, clear the text input
+                        textInputEditText.setText("");
+                        toastMessage("No password set for this slot.");
+                    }
+                }
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {}
+        });
+
 
 
     }
 
-    private void initializeInputsSpinner(){
-        inputs = ((Activity) this).findViewById(R.id.inputs);
+    private void buttonListener(){
+        findViewById(R.id.inputbutton).setOnClickListener(v -> {
+            if (editMode) {
+                // EditMode: Update the selected slot with the input value
+                String newInputValue = textInputEditText.getText().toString().trim();
+
+                if (inputsSpinner.getSelectedItemPosition() > 0) {
+                    // Update the selected input slot
+                    updateSpinnerWithInputValue(inputsSpinner, inputsSpinner.getSelectedItemPosition());
+                    toastMessage("Input slot updated.");
+                } else if (passwordsSpinner.getSelectedItemPosition() > 0) {
+                    // Update the selected password slot
+                    if (newInputValue.isEmpty()) {
+                        toastMessage("Please enter a value to update the password slot.");
+                    } else {
+                        inputValue = newInputValue;
+                        updateSpinnerWithInputValue(passwordsSpinner, passwordsSpinner.getSelectedItemPosition());
+                        toastMessage("Password slot updated.");
+                    }
+                } else {
+                    toastMessage("Please select a slot to edit.");
+                }
+            } else {
+                // Non-EditMode: Send the input value or password
+                inputValue = textInputEditText.getText().toString();
+                if (passwordsSpinner.getSelectedItemPosition() > 0) {
+                    if (actualPassword != null && !actualPassword.isEmpty()) {
+                        try {
+                            convertTextToHidReport(actualPassword);
+                        } catch (InterruptedException e) {
+                            throw new RuntimeException(e);
+                        }
+                        Log.d("mainpain", "Password sent: " + actualPassword);
+
+                        // Mask the password in the text box for feedback
+                        textInputEditText.setText("*".repeat(actualPassword.length()));
+                    } else {
+                        toastMessage("No password set for the selected slot.");
+                    }
+                }
+                else if (!inputValue.isEmpty() && targetDevice != null && hidDevice.getConnectionState(targetDevice) == BluetoothProfile.STATE_CONNECTED) {
+                    // Send the input value as a HID report
+                    try {
+                        convertTextToHidReport(inputValue);
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                    Log.d("mainpain", "Input value sent: " + inputValue);
+                } else if (inputsSpinner.getSelectedItemPosition() > 0) {
+                    // Send the selected input spinner value
+                    inputValue = inputsSpinner.getSelectedItem().toString();
+                    Log.d("mainpain", "Sending input spinner value: " + inputValue);
+                }  else {
+                    toastMessage("Please select an input or password slot.");
+                }
+            }
+
+            // Reset spinners and clear the text box
+            inputsSpinner.setSelection(0);
+            passwordsSpinner.setSelection(0);
+            textInputEditText.setText("");
+        });
+
+
+
+
+
+
+
+
+        findViewById(R.id.repeat_input).setOnClickListener(v -> {
+            // Check if repeat is currently active
+            if (!isRepeatActive) {
+                // Save the current text before repeating
+                lastInput = textInputEditText.getText().toString();
+
+                // Repeat the input value
+                textInputEditText.setText(inputValue);
+
+                // Set flag to indicate repeat is active
+                isRepeatActive = true;
+            } else {
+                // Undo the repeat by restoring the last input
+                textInputEditText.setText(lastInput);
+
+                // Set flag to indicate repeat is no longer active
+                isRepeatActive = false;
+            }
+        });
+
+
+        Switch editSwitch = findViewById(R.id.edit);
+        editSwitch.setOnClickListener(v -> {
+            editMode = editSwitch.isChecked();
+            logMessage("mainpain", "editMode: " + editMode);
+        });
     }
-    private void initializePasswordSpinner(){
-        passwords = ((Activity) this).findViewById(R.id.passwords);
+
+
+    private void initializeInputsSpinner() {
+        inputsSpinner = findViewById(R.id.inputs);
+
+        // Populate spinner with "Input" and numbered options
+        ArrayList<String> inputOptions = new ArrayList<>();
+        inputOptions.add("Inputs"); // First option
+        for (int i = 1; i <= 5; i++) {
+            inputOptions.add(i + ".");
+        }
+
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, inputOptions);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        inputsSpinner.setAdapter(adapter);
     }
+
+    private void initializePasswordSpinner() {
+        passwordsSpinner = findViewById(R.id.passwords);
+
+        // Initialize the password map
+        passwordsMap = new HashMap<>();
+
+        // Populate spinner with "Passwords" and empty slots
+        ArrayList<String> passwordOptions = new ArrayList<>();
+        passwordOptions.add("Passwords"); // First option
+        for (int i = 1; i <= 5; i++) {
+            passwordsMap.put(i + ".", ""); // Store empty value initially
+            passwordOptions.add(i + "."); // Add empty slot to spinner
+        }
+
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, passwordOptions);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        passwordsSpinner.setAdapter(adapter);
+    }
+
+
+
+
+
+
+    private void updateSpinnerWithInputValue(Spinner spinner, int position) {
+        if (position > 0) { // Skip the first "Passwords" option
+            ArrayAdapter<String> adapter = (ArrayAdapter<String>) spinner.getAdapter();
+            ArrayList<String> items = new ArrayList<>();
+            for (int i = 0; i < adapter.getCount(); i++) {
+                items.add(adapter.getItem(i));
+            }
+
+            // Retain the prefix (e.g., "1.") and conditionally mask the value
+            String selectedKey = items.get(position).split("\\.")[0] + ".";
+            passwordsMap.put(selectedKey, inputValue); // Update the actual value in the map
+            String maskedPassword = inputValue.isEmpty() ? "" : "*".repeat(inputValue.length()); // Masked value only if not empty
+            String updatedItem = selectedKey + (maskedPassword.isEmpty() ? "" : " " + maskedPassword); // Combine key with masked value
+
+            items.set(position, updatedItem); // Update the selected item
+
+            // Rebuild the spinner with updated values
+            ArrayAdapter<String> newAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, items);
+            newAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+            spinner.setAdapter(newAdapter);
+
+            // Retain the current selection
+            spinner.setSelection(position);
+        }
+    }
+
+
+
+
+
+
+
+
+
+
 
 
 
