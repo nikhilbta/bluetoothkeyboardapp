@@ -13,6 +13,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -53,6 +54,11 @@ public class Controller extends Activity implements UpdateView {
     private String lastInput = ""; // To store the last input before repeating
 
 
+    private Spinner inputs;
+    private Spinner passwords;
+
+    private TextInputEditText textInputEditText;
+
     @RequiresApi(api = Build.VERSION_CODES.S)
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -71,6 +77,12 @@ public class Controller extends Activity implements UpdateView {
         UView = new Controller();
         model = new Model(this, UView);
 
+        inputs = ((Activity) this).findViewById(R.id.inputs);
+        passwords = ((Activity) this).findViewById(R.id.passwords);
+
+        SharedPreferences prefs = getSharedPreferences("BTKBV2", MODE_PRIVATE);
+        inputValue = prefs.getString("input_value", "");
+
 
         getProxy();
         initializePairedSpinner();
@@ -79,8 +91,8 @@ public class Controller extends Activity implements UpdateView {
         spinnerListener();
 
 
-        TextInputEditText textInputEditText = findViewById(R.id.TextInputEditLayout);
-
+        textInputEditText = findViewById(R.id.TextInputEditLayout);
+        textInputEditText.setText(inputValue);
 
         findViewById(R.id.inputbutton).setOnClickListener(v -> {
             inputValue = textInputEditText.getText().toString();
@@ -119,6 +131,11 @@ public class Controller extends Activity implements UpdateView {
             }
         });
 
+        findViewById(R.id.edit).setOnClickListener(v -> {
+
+        });
+
+
 
     }
 
@@ -136,6 +153,7 @@ public class Controller extends Activity implements UpdateView {
     @Override
     protected void onPause() {
         super.onPause();
+        saveValues();
         if(model.getHidDevice() != null & model.getTargetDevice() != null) {
             model.getHidDevice().disconnect(model.getTargetDevice());
         }
@@ -144,6 +162,7 @@ public class Controller extends Activity implements UpdateView {
 
     protected void onDestroy() {
         super.onDestroy();
+        saveValues();
         model.getHidDevice().disconnect(model.getTargetDevice());
         if (receiver != null) {
             unregisterReceiver(receiver);
@@ -257,6 +276,8 @@ public class Controller extends Activity implements UpdateView {
             }
         });
 
+
+
     }
 
     private void initializePairedSpinner() {
@@ -316,6 +337,15 @@ public class Controller extends Activity implements UpdateView {
 
         // Start checking
         handler.post(checkCondition);
+    }
+
+    private void saveValues() {
+        inputValue = textInputEditText.getText().toString();
+        SharedPreferences prefs = getSharedPreferences("BTKBV2", MODE_PRIVATE);
+        SharedPreferences.Editor editor = prefs.edit();
+        editor.putString("input_value" , inputValue);
+        editor.apply();
+
     }
 
 

@@ -26,7 +26,6 @@ import java.util.concurrent.Executor;
 public class Model implements UpdateView{
     private ArrayList<BluetoothDevice> pairedDevices = new ArrayList<>();
     private ArrayList<BluetoothDevice> availableDevices = new ArrayList<>();
-    private BluetoothPermissionManager bluetoothPermissionManager;
     private BluetoothHidDevice hidDevice;
     private BluetoothAdapter btAdapter = BluetoothAdapter.getDefaultAdapter();
     private BluetoothDevice targetDevice;
@@ -50,7 +49,6 @@ public class Model implements UpdateView{
 
     public Spinner pairedDevicesSpinner;
     public Spinner availableDevicesSpinner;
-
 
     public void registerHidDevice(BluetoothProfile proxy, BluetoothHidDevice.Callback callback){
         hidDevice = (BluetoothHidDevice) proxy;

@@ -65,6 +65,31 @@
         android:text="Repeat Input"
         app:layout_constraintTop_toBottomOf="@id/inputbutton"
         />
+    <Switch
+        android:id="@+id/edit"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Edit Quick Inputs"
+        app:layout_constraintTop_toBottomOf="@id/inputbutton"
+        app:layout_constraintEnd_toEndOf="@id/paireddevices"
+        />
+
+    <Spinner
+        android:id="@+id/inputs"
+        android:layout_width="200dp"
+        android:layout_height="40dp"
+        app:layout_constraintTop_toBottomOf="@id/repeat_input"
+        app:layout_constraintStart_toStartOf="@id/devices"
+         />
+
+    <Spinner
+        android:id="@+id/passwords"
+        android:layout_width="200dp"
+        android:layout_height="40dp"
+        app:layout_constraintTop_toBottomOf="@id/repeat_input"
+        app:layout_constraintStart_toEndOf="@id/devices"
+        />
+
 
 
 </androidx.constraintlayout.widget.ConstraintLayout>
