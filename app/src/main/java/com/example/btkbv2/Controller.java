@@ -44,35 +44,35 @@ import java.util.concurrent.Executor;
 @SuppressLint("MissingPermission")
 public class Controller extends Activity implements UpdateView {
 
-    private BroadcastReceiver receiver;
-
     private BluetoothPermissionManager bluetoothPermissionManager;
-    private Model model;
     private UpdateView UView;
 
-    private ArrayList<BluetoothDevice> pairedDevices = new ArrayList<>();
-    private ArrayList<BluetoothDevice> availableDevices = new ArrayList<>();
-    private BluetoothHidDevice hidDevice;
-    private BluetoothAdapter btAdapter = BluetoothAdapter.getDefaultAdapter();
-    private BluetoothDevice targetDevice;
-    private BluetoothDevice newDevice;
-
-    private ArrayList<byte[]> reportSave;
-    private int currentByte;
-
     public Spinner pairedDevicesSpinner;
+    private ArrayList<BluetoothDevice> pairedDevices = new ArrayList<>();
     public Spinner availableDevicesSpinner;
-
-    private String inputValue;
-    private int regState;
-    private boolean isRepeatActive = false;
-    private String lastInput = ""; // To store the last input before repeating
-
-
+    private ArrayList<BluetoothDevice> availableDevices = new ArrayList<>();
     private Spinner inputs;
     private Spinner passwords;
 
     private TextInputEditText textInputEditText;
+
+    private BluetoothDevice targetDevice;
+    private BluetoothHidDevice hidDevice;
+    private BluetoothAdapter btAdapter = BluetoothAdapter.getDefaultAdapter();
+    private BroadcastReceiver receiver;
+
+    private ArrayList<byte[]> reportSave;
+    private int currentByte;
+
+    private int regState;
+
+    private String inputValue;
+    private boolean isRepeatActive = false;
+    private String lastInput = ""; // To store the last input before repeating
+
+
+
+
 
     @RequiresApi(api = Build.VERSION_CODES.S)
     @Override
@@ -90,7 +90,6 @@ public class Controller extends Activity implements UpdateView {
 
 
         UView = new Controller();
-        model = new Model(this, UView);
 
         inputs = ((Activity) this).findViewById(R.id.inputs);
         passwords = ((Activity) this).findViewById(R.id.passwords);
