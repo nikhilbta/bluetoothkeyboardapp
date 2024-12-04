@@ -50,20 +50,7 @@ public class Model implements UpdateView{
     public Spinner pairedDevicesSpinner;
     public Spinner availableDevicesSpinner;
 
-    public void registerHidDevice(BluetoothProfile proxy, BluetoothHidDevice.Callback callback){
-        hidDevice = (BluetoothHidDevice) proxy;
 
-        BluetoothHidDeviceAppSdpSettings sdp = new BluetoothHidDeviceAppSdpSettings(
-                "BlueHID",
-                "Android HID hackery",
-                "Android",
-                SUBCLASS1_KEYBOARD,
-                getDescriptor()
-        );
-        Executor executor = runnable -> new Thread(runnable).start();
-
-        hidDevice.registerApp(sdp, null, null, executor, callback);
-    }
 
 
 
