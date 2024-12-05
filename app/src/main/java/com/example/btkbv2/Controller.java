@@ -77,6 +77,8 @@ public class Controller extends Activity implements UpdateView {
     private String lastInput = ""; // To store the last input before repeating
 
     private HashMap<String, String> passwordsMap;
+    private HashMap<String, String> inputsMap; // Stores input values without masking
+
 
 
 
@@ -110,6 +112,7 @@ public class Controller extends Activity implements UpdateView {
         findAvailableDevices();
         spinnerListener();
         buttonListener();
+        loadValues();
 
     }
     @Override
@@ -350,16 +353,19 @@ public class Controller extends Activity implements UpdateView {
                 String newInputValue = textInputEditText.getText().toString().trim();
 
                 if (inputsSpinner.getSelectedItemPosition() > 0) {
-                    // Update the selected input slot
-                    updateSpinnerWithInputValue(inputsSpinner, inputsSpinner.getSelectedItemPosition());
+                    // Update the selected input slot in inputsMap
+                    String key = inputsSpinner.getSelectedItem().toString().split("\\.")[0] + ".";
+                    inputsMap.put(key, newInputValue); // Update inputsMap
+                    updateInputsSpinner(); // Refresh inputsSpinner
                     toastMessage("Input slot updated.");
                 } else if (passwordsSpinner.getSelectedItemPosition() > 0) {
-                    // Update the selected password slot
+                    // Update the selected password slot in passwordsMap
                     if (newInputValue.isEmpty()) {
                         toastMessage("Please enter a value to update the password slot.");
                     } else {
-                        inputValue = newInputValue;
-                        updateSpinnerWithInputValue(passwordsSpinner, passwordsSpinner.getSelectedItemPosition());
+                        String key = passwordsSpinner.getSelectedItem().toString().split("\\.")[0] + ".";
+                        passwordsMap.put(key, newInputValue);
+                        updatePasswordSpinner(); // Refresh passwordsSpinner
                         toastMessage("Password slot updated.");
                     }
                 } else {
@@ -382,8 +388,7 @@ public class Controller extends Activity implements UpdateView {
                     } else {
                         toastMessage("No password set for the selected slot.");
                     }
-                }
-                else if (!inputValue.isEmpty() && targetDevice != null && hidDevice.getConnectionState(targetDevice) == BluetoothProfile.STATE_CONNECTED) {
+                } else if (!inputValue.isEmpty() && targetDevice != null && hidDevice.getConnectionState(targetDevice) == BluetoothProfile.STATE_CONNECTED) {
                     // Send the input value as a HID report
                     try {
                         convertTextToHidReport(inputValue);
@@ -395,7 +400,7 @@ public class Controller extends Activity implements UpdateView {
                     // Send the selected input spinner value
                     inputValue = inputsSpinner.getSelectedItem().toString();
                     Log.d("mainpain", "Sending input spinner value: " + inputValue);
-                }  else {
+                } else {
                     toastMessage("Please select an input or password slot.");
                 }
             }
@@ -405,6 +410,7 @@ public class Controller extends Activity implements UpdateView {
             passwordsSpinner.setSelection(0);
             textInputEditText.setText("");
         });
+
 
 
 
@@ -445,17 +451,39 @@ public class Controller extends Activity implements UpdateView {
     private void initializeInputsSpinner() {
         inputsSpinner = findViewById(R.id.inputs);
 
-        // Populate spinner with "Input" and numbered options
+        // Initialize the inputs map
+        inputsMap = new HashMap<>();
+
+        // Populate spinner with "Inputs" and empty slots
         ArrayList<String> inputOptions = new ArrayList<>();
         inputOptions.add("Inputs"); // First option
         for (int i = 1; i <= 5; i++) {
-            inputOptions.add(i + ".");
+            inputsMap.put(i + ".", ""); // Store empty value initially
+            inputOptions.add(i + "."); // Add empty slot to spinner
         }
 
         ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, inputOptions);
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         inputsSpinner.setAdapter(adapter);
     }
+    private void updateInputsSpinner() {
+        ArrayAdapter<String> adapter = (ArrayAdapter<String>) inputsSpinner.getAdapter();
+        ArrayList<String> items = new ArrayList<>();
+
+        items.add("Inputs"); // Add the default title
+        for (int i = 1; i <= inputsMap.size(); i++) {
+            String key = i + ".";
+            String input = inputsMap.getOrDefault(key, "");
+            items.add(key + (input.isEmpty() ? "" : " " + input));
+        }
+
+        // Rebuild the spinner with updated values
+        adapter.clear();
+        adapter.addAll(items);
+        adapter.notifyDataSetChanged();
+    }
+
+
 
     private void initializePasswordSpinner() {
         passwordsSpinner = findViewById(R.id.passwords);
@@ -475,6 +503,50 @@ public class Controller extends Activity implements UpdateView {
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         passwordsSpinner.setAdapter(adapter);
     }
+    private void updatePasswordSpinner() {
+        ArrayAdapter<String> adapter = (ArrayAdapter<String>) passwordsSpinner.getAdapter();
+        ArrayList<String> items = new ArrayList<>();
+
+        items.add("Passwords"); // Add the default title
+        for (int i = 1; i <= passwordsMap.size(); i++) {
+            String key = i + ".";
+            String password = passwordsMap.get(key);
+            String maskedPassword = password.isEmpty() ? "" : "*".repeat(password.length());
+            items.add(key + (maskedPassword.isEmpty() ? "" : " " + maskedPassword));
+        }
+
+        // Rebuild the spinner with updated values
+        adapter.clear();
+        adapter.addAll(items);
+        adapter.notifyDataSetChanged();
+    }
+
+    private void loadValues() {
+        SharedPreferences prefs = getSharedPreferences("BTKBV2", MODE_PRIVATE);
+
+        // Load passwordsMap
+        for (String key : passwordsMap.keySet()) {
+            String savedPassword = prefs.getString("password_" + key, ""); // Load each password slot
+            passwordsMap.put(key, savedPassword);
+        }
+
+        // Update the password spinner to reflect the saved passwords
+        updatePasswordSpinner();
+
+        // Load inputsMap
+        for (String key : inputsMap.keySet()) {
+            String savedInput = prefs.getString("input_" + key, ""); // Load each input slot
+            inputsMap.put(key, savedInput);
+        }
+
+        // Update the inputs spinner to reflect the saved inputs
+        updateInputsSpinner();
+
+        Log.d("mainpain", "Passwords and inputs loaded from SharedPreferences.");
+    }
+
+
+
 
 
 
@@ -506,19 +578,6 @@ public class Controller extends Activity implements UpdateView {
             spinner.setSelection(position);
         }
     }
-
-
-
-
-
-
-
-
-
-
-
-
-
     private void updatePairedDevicesSpinnerModel(ArrayList<BluetoothDevice> newPairedDevices){
         Set<BluetoothDevice> pairedDevicesSet = btAdapter.getBondedDevices();
         pairedDevices.clear();
@@ -622,10 +681,25 @@ public class Controller extends Activity implements UpdateView {
         inputValue = textInputEditText.getText().toString();
         SharedPreferences prefs = getSharedPreferences("BTKBV2", MODE_PRIVATE);
         SharedPreferences.Editor editor = prefs.edit();
-        editor.putString("input_value" , inputValue);
-        editor.apply();
 
+        // Save inputValue
+        editor.putString("input_value", inputValue);
+
+        // Save passwordsMap
+        for (String key : passwordsMap.keySet()) {
+            editor.putString("password_" + key, passwordsMap.get(key)); // Save each password slot
+        }
+
+        // Save inputsMap
+        for (String key : inputsMap.keySet()) {
+            editor.putString("input_" + key, inputsMap.get(key)); // Save each input slot
+        }
+
+        editor.apply();
+        Log.d("mainpain", "Values, passwords, and inputs saved to SharedPreferences.");
     }
+
+
 
     private byte[] getDescriptor(){
         byte[] descriptor = new byte[]{

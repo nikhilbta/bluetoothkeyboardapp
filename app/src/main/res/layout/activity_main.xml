@@ -65,14 +65,16 @@
         android:text="Repeat Input"
         app:layout_constraintTop_toBottomOf="@id/inputbutton"
         />
+
     <Switch
         android:id="@+id/edit"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:layout_marginEnd="20dp"
         android:text="Edit Quick Inputs"
-        app:layout_constraintTop_toBottomOf="@id/inputbutton"
         app:layout_constraintEnd_toEndOf="@id/paireddevices"
-        />
+        app:layout_constraintTop_toBottomOf="@id/inputbutton" />
 
     <Spinner
         android:id="@+id/inputs"
