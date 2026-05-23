@@ -1,8 +1,25 @@
 package com.example.btkbv2;
 
+/*
+    Big Picture
+    Everything is managed by this Controller class. Execution starts with onCreate method. The user
+    interface description is loading in from activity_maim.xml. onCreate intializes the main
+    components and calls methods to set up bluetooth permissions and various UI callbacks. onCreate
+    also calls the getProxy() method which creates a BluetoothAdapter.
+ */
+
+
+
+
+
+
+
+
 import static android.bluetooth.BluetoothHidDevice.SUBCLASS1_KEYBOARD;
 
 
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.widget.EditText;
 import android.app.AlertDialog;
 import android.annotation.SuppressLint;
@@ -30,6 +47,7 @@ import android.widget.Spinner;
 import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.ToggleButton;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -90,10 +108,11 @@ public class Controller extends Activity implements UpdateView {
             return insets;
         });
 
+        //checks that all permissions are correct on start
         bluetoothPermissionManager = new BluetoothPermissionManager(this, this);
         bluetoothPermissionManager.checkAndRequestPermissions();
 
-
+        //loads previous values on start
         SharedPreferences prefs = getSharedPreferences("BTKBV2", MODE_PRIVATE);
         inputValue = prefs.getString("input_value", "");
         textInputEditText = findViewById(R.id.TextInputEditLayout);
@@ -103,8 +122,8 @@ public class Controller extends Activity implements UpdateView {
         getProxy();
         updatePairedDevicesSpinnerModel(pairedDevices);
         updateAvailableDevicesSpinnerModel(availableDevices);
-        initializeInputsSpinner();
         findAvailableDevices();
+        initializeInputsSpinner();
         spinnerListener();
         buttonListener();
         loadValues();
@@ -171,7 +190,12 @@ public class Controller extends Activity implements UpdateView {
         Log.d("mainpain", "Passwords and inputs loaded from SharedPreferences.");
     }
 
-
+/*
+We call btAdapter.getProfileProxy, providing a ServiceListener that has an onServiceConnected method.
+The method gets called with the proxy once it becomes available. The proxy is used for the HID
+BluetoothProfile. Then we create a callback object that is registered using registerHidDevice() to
+get the onConnectionStateChanged calls.
+ */
     private void getProxy() {
         btAdapter.getProfileProxy(this, new BluetoothProfile.ServiceListener() {
             @SuppressLint("MissingPermission")
@@ -182,29 +206,20 @@ public class Controller extends Activity implements UpdateView {
                         @Override
                         public void onConnectionStateChanged(BluetoothDevice device, final int state) {
                             if (device.equals(targetDevice)) {
-                                Runnable statusUpdateRunnable = new Runnable() {
+                                runOnUiThread(new Runnable() {
                                     @Override
                                     public void run() {
-                                        runOnUiThread(new Runnable() {
-                                            @Override
-                                            public void run() {
-                                                if (state == BluetoothProfile.STATE_DISCONNECTED) {
-                                                    logMessage("mainpain", "HID Device currently disconnected from: " + device.getName());
-                                                } else if (state == BluetoothProfile.STATE_CONNECTING) {
-                                                    toastMessage("Connecting...");
-                                                } else if (state == BluetoothProfile.STATE_CONNECTED) {
-                                                    toastMessage("Connected");
-                                                } else if (state == BluetoothProfile.STATE_DISCONNECTING) {
-                                                    logMessage("mainpain", "HID Device currently disconnecting from: " + device.getName());
-                                                }
-                                            }
-                                        });
+                                        if (state == BluetoothProfile.STATE_DISCONNECTED) {
+                                            logMessage("mainpain", "HID Device currently disconnected from: " + device.getName());
+                                        } else if (state == BluetoothProfile.STATE_CONNECTING) {
+                                            toastMessage("Connecting...");
+                                        } else if (state == BluetoothProfile.STATE_CONNECTED) {
+                                            toastMessage("Connected");
+                                        } else if (state == BluetoothProfile.STATE_DISCONNECTING) {
+                                            logMessage("mainpain", "HID Device currently disconnecting from: " + device.getName());
+                                        }
                                     }
-                                };
-
-                                Thread statusUpdateThread = new Thread(statusUpdateRunnable);
-
-                                statusUpdateThread.start();
+                                });
                             }
                         }
 
@@ -365,7 +380,11 @@ public class Controller extends Activity implements UpdateView {
                 } catch (InterruptedException e) {
                     throw new RuntimeException(e);
                 }
+
                 Log.d("mainpain", "Input value sent: " + inputValue);
+
+                inputsSpinner.setSelection(0);
+                textInputEditText.setText("");
             } else if (inputsSpinner.getSelectedItemPosition() > 0) {
                 inputValue = inputsSpinner.getSelectedItem().toString();
                 Log.d("mainpain", "Sending input spinner value: " + inputValue);
@@ -373,8 +392,7 @@ public class Controller extends Activity implements UpdateView {
                 toastMessage("Please select an input or password slot.");
             }
 
-            inputsSpinner.setSelection(0);
-            textInputEditText.setText("");
+
         });
 
 
@@ -389,11 +407,56 @@ public class Controller extends Activity implements UpdateView {
             }
         });
 
+        Handler handler = new Handler();
+        Runnable liveTask;
 
-        Switch editSwitch = findViewById(R.id.edit);
+        liveTask = new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    inputValue = textInputEditText.getText().toString();
+
+                    if (!inputValue.isEmpty()) {
+                        convertTextToHidReport(inputValue);
+                        textInputEditText.setText("");
+                        Log.d("Toggle", "Sent after inactivity");
+                    }
+                } catch (InterruptedException e) {
+                    Log.e("Toggle", "Interrupted", e);
+                }
+            }
+        };
+        ToggleButton liveMode = findViewById(R.id.livemode);
+
+        liveMode.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (isChecked) {
+                handler.post(liveTask);      // START repeating task
+            } else {
+                handler.removeCallbacks(liveTask);  // STOP the task
+            }
+        });
+
+
+            Switch editSwitch = findViewById(R.id.edit);
         editSwitch.setOnClickListener(v -> {
             editMode = editSwitch.isChecked();
             logMessage("mainpain", "editMode: " + editMode);
+        });
+        textInputEditText.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                // Cancel any pending send
+                handler.removeCallbacks(liveTask);
+
+                // Schedule send after 5 seconds of inactivity
+                handler.postDelayed(liveTask, 5000);
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {}
         });
     }
 
@@ -410,6 +473,25 @@ public class Controller extends Activity implements UpdateView {
         inputsAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, getFormattedInputList());
         inputsAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         inputsSpinner.setAdapter(inputsAdapter);
+    }
+
+    private void liveMode(){
+        Handler handler = new Handler();
+        Runnable task = new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    convertTextToHidReport(inputValue);
+                    textInputEditText.setText("");
+                    Log.d("Toggle", "Running ask...");
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+
+                Log.d("Toggle", "Running task...");
+                handler.postDelayed(this, 5000);
+            }
+        };
     }
 
     private void spinnerListener() {
@@ -494,6 +576,7 @@ public class Controller extends Activity implements UpdateView {
             public void onNothingSelected(AdapterView<?> parent) {
             }
         });
+
 
 
     }
